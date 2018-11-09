@@ -69,7 +69,7 @@ def _remove_nan_from_df(df):
     print "Read and cleaned the dataframe\n",df.head()
 
 ############### PREDICTION FUNCTIONS ############################
-def make_prediction(k_val,df16,df17,dfLoc):
+def make_prediction(k_val,df16,df17,dfLoc,type):
     '''
     This function will find the K-Nearest Neighbour and then make
     prediction using the weighted average based on the distance from
@@ -80,6 +80,7 @@ def make_prediction(k_val,df16,df17,dfLoc):
             df16    : the pollution dataset for the year 2016
             df17    : the pollution dataset for the year 2017
             dfLoc   : the dataset containing the location of stations
+            type    : recursive or rolling
     '''
     #Taking out the section of 2017 for prediction
     df17=df17[ (df17['month']==1) & (df17['day']==1) ]
@@ -92,18 +93,37 @@ def make_prediction(k_val,df16,df17,dfLoc):
     print "df17 description\n",df17.describe()
 
     #iterating over 2017 entreis for making prediction
+    errors=[]
+
     for i in range(df17.shape[0]):
         #Taking out the 2017 entry separately
         pred_series=df17.iloc[i]
-        print "Making prediction for df17 entry: ",i
+        print "\nMaking prediction for df17 entry: ",i
+        print "Sanity check",df16.shape
+        #print pred_series
 
         #Getting the prediction
-        make_recursive_prediction(k_val,df16,pred_series,norm=False)
-        return
+        error=make_recursive_prediction(k_val,df16,pred_series,norm=False)
+        errors.append(error)
 
+        #handling the type of the rolling window
+        if(type=='recursive'):
+            #Adding the current series to our record
+            df16=df16.append(pred_series,ignore_index=True)
+        else:
+            #Dropping the ith element (reindexing not done)
+            df16.drop([i],axis=0,inplace=True)#removing one element at a time
+            #Adding the new element
+            df16=df16.append(pred_series,ignore_index=True)
 
+    return errors
 
 def make_recursive_prediction(k_val,df16,pred_series,norm=False):
+    '''
+    This function will calculation the distance from the neighbour
+    and then choose the best top k among them to calculate the average
+    prediction.
+    '''
     print "Calculating the distance from the whole previous dataframe"
     #Getting the distance from all the element (way 1)
     # dist_df=df16.apply(_get_distance_unnormalized,
@@ -114,15 +134,13 @@ def make_recursive_prediction(k_val,df16,pred_series,norm=False):
 
     #Getting the distance from all the other elements (way2)
     extract_elements=['lon','lat','elevation',      #spatial elemets
-                    'hour','day','month','BEN','CO',#temporal and features
+                    'hour','day','month',#'year',#temporal and features
                     'EBE','NMHC','NO','NO_2','O_3',
-                    'SO_2','TCH','TOL'
+                    'SO_2','TCH','TOL','BEN','CO'
                     ]
     #Converting the dataframe into matrix with the required element
     df16_mat=(df16[extract_elements]).values
     pred_vec=(pred_series[extract_elements]).values
-    print (df16_mat.shape,pred_vec.shape)
-
     #Extracting the prediction feature in same order
     pred_mat=(df16[['PM10','PM25']]).values
 
@@ -130,11 +148,46 @@ def make_recursive_prediction(k_val,df16,pred_series,norm=False):
     distance=_get_distance_unnormalized_V2(df16_mat,pred_vec,norm)
 
     #Now taking the top k to make prediction
+    pred_PM10=0.0
+    pred_PM25=0.0
+    norm_distance=0.0
 
+    done_idx=[]
+    for i in range(k_val):
+        min=1e6 #setting a default value (INTMAX)
+        min_idx=-1
+        #Calculating the minimum (doing iteratively instead of sorting)
+        for idx in range(distance.shape[0]):
+            if((distance[idx]<min) and (idx not in done_idx) ):
+                min=distance[idx]
+                min_idx=idx
+        #Saving the minimum to the list for taking distinct next time
+        done_idx.append(min_idx)
 
-    #Adding the new entry to the dataframe
+        #calculating the prediction
+        pred_PM10+=(1.0/distance[min_idx])*pred_mat[min_idx,0]
+        pred_PM25+=(1.0/distance[min_idx])*pred_mat[min_idx,1]
+        norm_distance+=(1.0/distance[min_idx])
 
-    print distance
+    #Averaging the weighted sum
+    act_PM10=pred_series['PM10']
+    act_PM25=pred_series['PM25']
+    pred_PM10=pred_PM10/norm_distance
+    pred_PM25=pred_PM25/norm_distance
+
+    #Printing the error and the prediction
+    #print done_idx
+    print "PM10 actual:{} pred:{} error:{}".format(act_PM10,
+                                                    pred_PM10,
+                                                    act_PM10-pred_PM10)
+    print "PM25 actual:{} pred:{} error:{}".format(act_PM25,
+                                                    pred_PM25,
+                                                    act_PM25-pred_PM25)
+
+    #Creating the result tuple
+    result=(act_PM10-pred_PM10,act_PM25-pred_PM25)
+
+    return result
 
 def _get_distance_unnormalized(data_series,pred_series,dfLoc,norm):
     '''
@@ -196,10 +249,10 @@ if __name__=='__main__':
     data16_fname='dataset/madrid_2016.csv'
     data17_fname='dataset/madrid_2017.csv'
     loc_fname='dataset/stations.csv'
-    k_val=3
+    k_val=1
 
     #Cleaning the dataset
     df16,df17,dfLoc=data_parser(data16_fname,data17_fname,loc_fname)
 
     #Prediction function
-    make_prediction(k_val,df16,df17,dfLoc)
+    make_prediction(k_val,df16,df17,dfLoc,type='rolling')
