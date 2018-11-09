@@ -12,14 +12,14 @@ def data_parser(data16_fname,data17_fname,loc_fname):
         INPUT:
             data16_fname   :  2016 pollution data filename
             data17_fname   :  2017 pollution data filename
-            loc_fname  :  the location file
+            loc_fname      :  the location file
     '''
     try:
         print "Loading the cached data"
         df16=pd.read_csv('dataset/cleaned_2016.csv')
         df17=pd.read_csv('dataset/cleaned_2017.csv')
         dfLoc=pd.read_csv(loc_fname)
-        dfLoc=dfLoc.set_index('id')
+        dfLoc.rename({'id':'station'},axis='columns',inplace=True)
 
         return df16,df17,dfLoc
     except:
@@ -84,30 +84,57 @@ def make_prediction(k_val,df16,df17,dfLoc):
     #Taking out the section of 2017 for prediction
     df17=df17[ (df17['month']==1) & (df17['day']==1) ]
 
+    #Joining the pollution dataframe with the location info
+    df16=pd.merge(df16,dfLoc,how='left',on='station')
+    df17=pd.merge(df17,dfLoc,how='left',on='station')
+
+    print "df16 description\n",df16.describe()
+    print "df17 description\n",df17.describe()
+
     #iterating over 2017 entreis for making prediction
     for i in range(df17.shape[0]):
         #Taking out the 2017 entry separately
         pred_series=df17.iloc[i]
-        print pred_series
+        print "Making prediction for df17 entry: ",i
 
         #Getting the prediction
-        make_recursive_prediction(k_val,df16,pred_series,dfLoc,norm=False)
+        make_recursive_prediction(k_val,df16,pred_series,norm=False)
         return
 
 
 
-def make_recursive_prediction(k_val,df16,pred_series,dfLoc,norm=False):
-    #Getting the distance from all the element
-    dist_df=df16.apply(_get_distance_unnormalized,
-                axis=1,
-                pred_series=pred_series,
-                dfLoc=dfLoc,
-                norm=norm)
+def make_recursive_prediction(k_val,df16,pred_series,norm=False):
+    print "Calculating the distance from the whole previous dataframe"
+    #Getting the distance from all the element (way 1)
+    # dist_df=df16.apply(_get_distance_unnormalized,
+    #             axis=1,
+    #             pred_series=pred_series,
+    #             dfLoc=dfLoc,
+    #             norm=norm)
+
+    #Getting the distance from all the other elements (way2)
+    extract_elements=['lon','lat','elevation',      #spatial elemets
+                    'hour','day','month','BEN','CO',#temporal and features
+                    'EBE','NMHC','NO','NO_2','O_3',
+                    'SO_2','TCH','TOL'
+                    ]
+    #Converting the dataframe into matrix with the required element
+    df16_mat=(df16[extract_elements]).values
+    pred_vec=(pred_series[extract_elements]).values
+    print (df16_mat.shape,pred_vec.shape)
+
+    #Extracting the prediction feature in same order
+    pred_mat=(df16[['PM10','PM25']]).values
+
+    #Now making the prediction vectorially
+    distance=_get_distance_unnormalized_V2(df16_mat,pred_vec,norm)
+
     #Now taking the top k to make prediction
+
 
     #Adding the new entry to the dataframe
 
-    print dist_df
+    print distance
 
 def _get_distance_unnormalized(data_series,pred_series,dfLoc,norm):
     '''
@@ -148,6 +175,22 @@ def _get_distance_unnormalized(data_series,pred_series,dfLoc,norm):
 
     #Returnig these three items incase the order is not maintained
     return PM10,PM25,total_distance
+
+def _get_distance_unnormalized_V2(data_mat,pred_vec,norm):
+    '''
+    This function will calculate the distance using only the matrix
+    miltiplication to make the computation fast
+    '''
+    #Normlaizing the matrix if required
+    if norm==True:
+        data_mat=data_mat/np.sum(np.square(data_mat),axis=1,keepdims=True)
+        pred_vec=pred_vec/np.sum(np.square(pred_vec))
+
+    #Now finding the distance vectorially
+    distance=np.sum(np.square(data_mat-pred_vec),axis=1)**(0.5)
+
+    return distance
+
 
 if __name__=='__main__':
     data16_fname='dataset/madrid_2016.csv'
