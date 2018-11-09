@@ -244,6 +244,33 @@ def _get_distance_unnormalized_V2(data_mat,pred_vec,norm):
 
     return distance
 
+##################### RESULTS PLOTTING ########################
+def plot_predictions(errors):
+    '''
+    This fucntion will take the list tuple of errror and plot a
+    histogram.
+    '''
+    #Extracting out the errors from the list of tuples
+    error_PM10,error_PM25=zip(*errors)
+
+    #Creating the figure object
+    fig=plt.figure()
+    nbins=100
+
+    #Adding the histogram for the first element
+    ax1=fig.add_subplot(121)
+    ax1.hist(error_PM10,bins=nbins,facecolor='green',edgecolor='black',alpha=0.67)
+    ax1.set_title("Error Histogram PM10 prediction")
+    ax1.set_xlabel("Absolute Error")
+    ax1.set_ylabel("Frequency")
+
+    ax2=fig.add_subplot(122)
+    ax2.hist(error_PM25,bins=nbins,facecolor='green',edgecolor='black',alpha=0.67)
+    ax2.set_title("Error Histogram PM25 prediction")
+    ax2.set_xlabel("Absolute Error")
+    ax2.set_ylabel("Frequency")
+
+    plt.show()
 
 if __name__=='__main__':
     data16_fname='dataset/madrid_2016.csv'
@@ -255,4 +282,7 @@ if __name__=='__main__':
     df16,df17,dfLoc=data_parser(data16_fname,data17_fname,loc_fname)
 
     #Prediction function
-    make_prediction(k_val,df16,df17,dfLoc,type='rolling')
+    errors=make_prediction(k_val,df16,df17,dfLoc,type='rolling')
+
+    #Plotting the results
+    plot_predictions(errors)
