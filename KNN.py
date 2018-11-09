@@ -14,19 +14,32 @@ def data_parser(data16_fname,data17_fname,loc_fname):
             data17_fname   :  2017 pollution data filename
             loc_fname  :  the location file
     '''
-    #Reading the dataframe and cleaning them
-    df16=pd.read_csv(data16_fname)
-    _remove_nan_from_df(df16)
+    try:
+        print "Loading the cached data"
+        df16=pd.read_csv('dataset/cleaned_2016.csv')
+        df17=pd.read_csv('dataset/cleaned_2017.csv')
+        dfLoc=pd.read_csv(loc_fname)
+        dfLoc=dfLoc.set_index('id')
 
-    #Reading the 2017 dataframe
-    df17=pd.read_csv(data17_fname)
-    _remove_nan_from_df(df17)
+        return df16,df17,dfLoc
+    except:
+        print ("Load Failed, cleaning the dataset")
+        #Reading the dataframe and cleaning them
+        df16=pd.read_csv(data16_fname)
+        _remove_nan_from_df(df16)
 
-    #Rerading and cleaning the stations dataframe
-    dfLoc=pd.read_csv(loc_fname)
-    #_remove_nan_from_df(dfLoc)
+        #Reading the 2017 dataframe
+        df17=pd.read_csv(data17_fname)
+        _remove_nan_from_df(df17)
 
-    return df16,df17,dfLoc
+        #Rerading and cleaning the stations dataframe
+        dfLoc=pd.read_csv(loc_fname)
+        #_remove_nan_from_df(dfLoc)
+
+        df16.to_csv('dataset/cleaned_2016.csv')
+        df17.to_csv('dataset/cleaned_2017.csv')
+
+        return df16,df17,dfLoc
 
 def _remove_nan_from_df(df):
     '''
@@ -56,27 +69,94 @@ def _remove_nan_from_df(df):
     print "Read and cleaned the dataframe\n",df.head()
 
 ############### PREDICTION FUNCTIONS ############################
-def make_prediction(df16,df17,dfLoc):
+def make_prediction(k_val,df16,df17,dfLoc):
     '''
     This function will find the K-Nearest Neighbour and then make
     prediction using the weighted average based on the distance from
     other neighbours.
     USAGE:
         INPUT:
+            k_val   : the number of nearest neighbour we have to take
             df16    : the pollution dataset for the year 2016
             df17    : the pollution dataset for the year 2017
             dfLoc   : the dataset containing the location of stations
     '''
-    #iterating thought each of the entreis of 2017 dataset
+    #Taking out the section of 2017 for prediction
+    df17=df17[ (df17['month']==1) & (df17['day']==1) ]
+
+    #iterating over 2017 entreis for making prediction
+    for i in range(df17.shape[0]):
+        #Taking out the 2017 entry separately
+        pred_series=df17.iloc[i]
+        print pred_series
+
+        #Getting the prediction
+        make_recursive_prediction(k_val,df16,pred_series,dfLoc,norm=False)
+        return
 
 
+
+def make_recursive_prediction(k_val,df16,pred_series,dfLoc,norm=False):
+    #Getting the distance from all the element
+    dist_df=df16.apply(_get_distance_unnormalized,
+                axis=1,
+                pred_series=pred_series,
+                dfLoc=dfLoc,
+                norm=norm)
+    #Now taking the top k to make prediction
+
+    #Adding the new entry to the dataframe
+
+    print dist_df
+
+def _get_distance_unnormalized(data_series,pred_series,dfLoc,norm):
+    '''
+    This function will calculate the distance between the two points
+    in the location-pollution space.
+    '''
+    #Calculating the distance between station (spatial distance)
+    stat1_idx=data_series.loc['station']
+    stat2_idx=pred_series.loc['station']
+    #Extracting the location data from locdf
+    locinfo1=dfLoc.loc[stat1_idx][['lon','lat','elevation']]
+    locinfo2=dfLoc.loc[stat2_idx][['lon','lat','elevation']]
+    #Add optimal normalization here
+    if norm==True:
+        locinfo1=locinfo1/np.sum(np.square(locinfo1))
+        locinfo2=locinfo2/np.sum(np.square(locinfo2))
+    #Getting the distance between them
+    diff1=np.sum(np.square(locinfo1.subtract(locinfo2)))
+
+    #Calculating the distance between event (temporal and feature)
+    extract_entry=['hour','day','month','BEN','CO',
+                    'EBE','NMHC','NO','NO_2','O_3',
+                    'SO_2','TCH','TOL'
+                    ]
+    #Extracting out the info
+    datainfo=data_series[extract_entry]
+    predinfo=pred_series[extract_entry]
+    #Normlaizing them optinally
+    if norm==True:
+        datainfo=datainfo/np.sum(np.square(datainfo))
+        predinfo=predinfo/np.sum(np.square(predinfo))
+    #Subtracting the value
+    diff2=np.sum(np.square(datainfo.subtract(predinfo)))
+
+    total_distance=diff2+diff1
+    PM10=data_series['PM10']
+    PM25=data_series['PM25']
+
+    #Returnig these three items incase the order is not maintained
+    return PM10,PM25,total_distance
 
 if __name__=='__main__':
     data16_fname='dataset/madrid_2016.csv'
     data17_fname='dataset/madrid_2017.csv'
     loc_fname='dataset/stations.csv'
+    k_val=3
 
     #Cleaning the dataset
-    data_parser(data16_fname,data17_fname,loc_fname)
+    df16,df17,dfLoc=data_parser(data16_fname,data17_fname,loc_fname)
 
     #Prediction function
+    make_prediction(k_val,df16,df17,dfLoc)
