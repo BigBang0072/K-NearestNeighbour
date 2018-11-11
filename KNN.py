@@ -34,6 +34,7 @@ def data_parser(data16_fname,data17_fname,loc_fname):
 
         #Rerading and cleaning the stations dataframe
         dfLoc=pd.read_csv(loc_fname)
+        dfLoc.rename({'id':'station'},axis='columns',inplace=True)
         #_remove_nan_from_df(dfLoc)
 
         df16.to_csv('dataset/cleaned_2016.csv')
@@ -56,15 +57,23 @@ def _remove_nan_from_df(df):
     month=[]
     day=[]
     hour=[]
+    year=[]
     for i in range(df.shape[0]):
         time=datetime.strptime(df.iloc[i]['date'],'%Y-%m-%d %X')
+        year.append(time.year)
         month.append(time.month)
         day.append(time.day)
         hour.append(time.hour)
 
+    df['year']=year
     df['month']=month
     df['day']=day
     df['hour']=hour
+
+    #Sorting the dataframe
+    print "Sorting the dataframe according to year-month-day-hour"
+    sort_by=['year','month','day','hour']
+    df.sort_values(sort_by,inplace=True)
 
     print "Read and cleaned the dataframe\n",df.head()
 
@@ -276,7 +285,7 @@ if __name__=='__main__':
     data16_fname='dataset/madrid_2016.csv'
     data17_fname='dataset/madrid_2017.csv'
     loc_fname='dataset/stations.csv'
-    k_val=1
+    k_val=10
 
     #Cleaning the dataset
     df16,df17,dfLoc=data_parser(data16_fname,data17_fname,loc_fname)
