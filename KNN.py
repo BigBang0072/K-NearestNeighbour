@@ -78,7 +78,7 @@ def _remove_nan_from_df(df):
     print "Read and cleaned the dataframe\n",df.head()
 
 ############### PREDICTION FUNCTIONS ############################
-def make_prediction(k_val,df16,df17,dfLoc,type):
+def make_prediction(k_val,df16,df17,dfLoc,type,norm):
     '''
     This function will find the K-Nearest Neighbour and then make
     prediction using the weighted average based on the distance from
@@ -90,6 +90,7 @@ def make_prediction(k_val,df16,df17,dfLoc,type):
             df17    : the pollution dataset for the year 2017
             dfLoc   : the dataset containing the location of stations
             type    : recursive or rolling
+            norm    : whether we want to normalize the data or not
     '''
     #Taking out the section of 2017 for prediction
     df17=df17[ (df17['month']==1) & (df17['day']==1) ]
@@ -102,7 +103,7 @@ def make_prediction(k_val,df16,df17,dfLoc,type):
     print "df17 description\n",df17.describe()
 
     #iterating over 2017 entreis for making prediction
-    errors=[]
+    results=[]
 
     for i in range(df17.shape[0]):
         #Taking out the 2017 entry separately
@@ -112,8 +113,8 @@ def make_prediction(k_val,df16,df17,dfLoc,type):
         #print pred_series
 
         #Getting the prediction
-        error=make_recursive_prediction(k_val,df16,pred_series,norm=False)
-        errors.append(error)
+        result=make_recursive_prediction(k_val,df16,pred_series,norm)
+        results.append(result)
 
         #handling the type of the rolling window
         if(type=='recursive'):
@@ -125,7 +126,7 @@ def make_prediction(k_val,df16,df17,dfLoc,type):
             #Adding the new element
             df16=df16.append(pred_series,ignore_index=True)
 
-    return errors
+    return results
 
 def make_recursive_prediction(k_val,df16,pred_series,norm=False):
     '''
@@ -143,7 +144,7 @@ def make_recursive_prediction(k_val,df16,pred_series,norm=False):
 
     #Getting the distance from all the other elements (way2)
     extract_elements=['lon','lat','elevation',      #spatial elemets
-                    'hour','day','month',#'year',#temporal and features
+                    'hour','day','month','year',#temporal and features
                     'EBE','NMHC','NO','NO_2','O_3',
                     'SO_2','TCH','TOL','BEN','CO'
                     ]
@@ -194,7 +195,10 @@ def make_recursive_prediction(k_val,df16,pred_series,norm=False):
                                                     act_PM25-pred_PM25)
 
     #Creating the result tuple
-    result=(act_PM10-pred_PM10,act_PM25-pred_PM25)
+    result=[
+            (act_PM10,pred_PM10,act_PM10-pred_PM10),
+            (act_PM25,pred_PM25,act_PM25-pred_PM25),
+            ]
 
     return result
 
@@ -260,8 +264,60 @@ def plot_predictions(errors):
     histogram.
     '''
     #Extracting out the errors from the list of tuples
-    error_PM10,error_PM25=zip(*errors)
+    results_PM10,results_PM25=zip(*errors)
 
+    #Extracting out the actual,pred and arror from the result
+    act10,pred10,error10=zip(*results_PM10)
+    #Extracting out the from the results of PM25
+    act25,pred25,error25=zip(*results_PM25)
+
+    #Plotting the prediction bar graph
+    plot_actual_prediction_plot(act10,pred10,act25,pred25)
+    #Plotting the histogram
+    plot_error_histogram(error10,error25)
+
+    #Printing the average error
+    mean_error10=np.mean(np.abs(np.array(error10)))
+    mean_error25=np.mean(np.abs(np.array(error25)))
+
+    #Printing the mean error
+    print "The mean Error in PM10 prediction: ",mean_error10
+    print "The mean Error in PM25 prediction: ",mean_error25
+
+def plot_actual_prediction_plot(act10,pred10,act25,pred25):
+    '''
+    Here we will plot the actual and the prediction plots for the
+    both PM10 and PM25 particles
+    '''
+    #Creating the figure
+    fig=plt.figure()
+    idx=range(len(act10))
+
+    #Plotting the PM10 actual and prediction
+    ax1=fig.add_subplot(211)
+    ax1.bar(idx,act10,color='#ff9933',label='actual')
+    ax1.bar(idx,pred10,alpha=0.5,color='b',label='prediction')
+    ax1.set_title('Actual and prediction overlay Plot')
+    ax1.set_xlabel('Samples with Actual and Prediction')
+    ax1.set_ylabel('Value')
+    ax1.legend()
+
+
+    ax2=fig.add_subplot(212)
+    ax2.bar(idx,act25,color='#ff9933',label='actual')
+    ax2.bar(idx,pred25,alpha=0.5,color='b',label='prediction')
+    ax2.set_title('Actual and prediction overlay Plot')
+    ax2.set_xlabel('Samples with Actual and Prediction')
+    ax2.set_ylabel('Value')
+    ax2.legend()
+
+    plt.show()
+
+def plot_error_histogram(error_PM10,error_PM25):
+    '''
+    This function will plot the error histogram from the error and the
+    prediction difference.
+    '''
     #Creating the figure object
     fig=plt.figure()
     nbins=100
@@ -285,13 +341,17 @@ if __name__=='__main__':
     data16_fname='dataset/madrid_2016.csv'
     data17_fname='dataset/madrid_2017.csv'
     loc_fname='dataset/stations.csv'
-    k_val=10
+
+    #Hyperparameters
+    k_val=1
+    type='rolling'
+    norm=False
 
     #Cleaning the dataset
     df16,df17,dfLoc=data_parser(data16_fname,data17_fname,loc_fname)
 
     #Prediction function
-    errors=make_prediction(k_val,df16,df17,dfLoc,type='rolling')
+    results=make_prediction(k_val,df16,df17,dfLoc,type,norm)
 
     #Plotting the results
-    plot_predictions(errors)
+    plot_predictions(results)
