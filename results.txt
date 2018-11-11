@@ -1,0 +1,47 @@
+1.k=1
+    a.type:rolling
+        i.norm:False
+            The mean Error in PM10 prediction:  5.238769349377339
+            The mean Error in PM25 prediction:  2.993072647871349
+        ii.norm:True
+            The mean Error in PM10 prediction:  5.24050546048845
+            The mean Error in PM25 prediction:  2.993072647871349
+
+    b.type:recursive
+        i.norm:False
+            The mean Error in PM10 prediction:  5.1715539434259705
+            The mean Error in PM25 prediction:  2.979804377341254
+        ii.norm:True
+            The mean Error in PM10 prediction:  5.173290054537081
+            The mean Error in PM25 prediction:  2.979804377341254
+
+1.k=10
+    a.type:rolling
+        i.norm:False
+            The mean Error in PM10 prediction:  4.677297731050447
+            The mean Error in PM25 prediction:  2.8560362549746303
+        ii.norm:True
+            The mean Error in PM10 prediction:  4.685667754857816
+            The mean Error in PM25 prediction:  2.8534532811306557
+
+    b.type:recursive
+        i.norm:False
+            The mean Error in PM10 prediction:  4.6559728833396115
+            The mean Error in PM25 prediction:  2.870014923489734
+        ii.norm:True
+            The mean Error in PM10 prediction:  4.669200602868082
+            The mean Error in PM25 prediction:  2.871752434543403
+
+
+1.k=100
+    a.type:rolling
+        i.norm:False
+            The mean Error in PM10 prediction:  4.683411672699034
+            The mean Error in PM25 prediction:  3.267446601185241
+        ii.norm:True
+
+    b.type:recursive
+        i.norm:False
+            The mean Error in PM10 prediction:  4.679456355750351
+            The mean Error in PM25 prediction:  3.2635719878572917
+        ii.norm:True

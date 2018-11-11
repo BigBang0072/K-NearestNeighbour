@@ -120,7 +120,7 @@ def make_prediction(k_val,df16,df17,dfLoc,type,norm):
         if(type=='recursive'):
             #Adding the current series to our record
             df16=df16.append(pred_series,ignore_index=True)
-        else:
+        elif(type=='rolling'):
             #Dropping the ith element (reindexing not done)
             df16.drop([i],axis=0,inplace=True)#removing one element at a time
             #Adding the new element
@@ -343,8 +343,8 @@ if __name__=='__main__':
     loc_fname='dataset/stations.csv'
 
     #Hyperparameters
-    k_val=1
-    type='rolling'
+    k_val=100
+    type='recursive'
     norm=False
 
     #Cleaning the dataset
