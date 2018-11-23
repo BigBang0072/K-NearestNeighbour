@@ -1,2 +1,3 @@
-*.csv
+cleaned_2016.csv
+cleaned_2017.csv
 *.pyc
